@@ -1,0 +1,108 @@
+
+# Depending on the version of R software the packages can be installed.
+source("https://bioconductor.org/biocLite.R")
+(!require("BiocManager", quietly = TRUE))
+install.packages("BiocManager")
+install.packages("devtools")
+BiocManager::install("DESeq2")
+install.packages("DeSeq2")
+library(DeSeq2)
+browseVignettes("DESeq2")
+library(ggplot2)
+library(tidyverse)
+install.packages('tidyverse')
+
+# Open data file
+countData <- read.csv('GSE134755 iDEP.csv', header = TRUE, sep = ";")
+head(countData)
+
+# Open metadata file
+metaData <- read.csv('metadata_GSE151796.csv', header = TRUE, sep = ";")
+head(metaData)
+
+# DEseq analysis
+dds <- DESeqDataSetFromMatrix(countData=countData,
+colData=metaData,
+design=~condition, tidy = TRUE)
+dds
+head(dds)
+assay(dds)
+counts(dds)
+
+# differential expression by DESeq
+dds <- DESeq(dds)
+dds <- estimateDispersionsGeneEst(dds)
+res <- results(dds)
+head(res)
+head(results(dds, tidy=TRUE))
+
+# create MA-plot of data
+plotMA(res, ylim=c(-2,2))
+
+# organise data
+for (i in 1:3){
+gene <- rownames("LGR5", res)[i]
+main = gene
+DESeq2::plotCounts(dds, gene=gene, intgroup="condition", main = main)
+}
+
+# generate plot of genes selected
+topGene <- rownames(res)
+plotCounts(dds, gene = topGene, intgroup=c("condition"))
+view(topGene)
+head(topGene)
+head(res)
+
+# generate plot of genes max values of differential expression
+plotCounts(dds, gene=which.max(result$padj), intgroup='condition')
+plotCounts(dds, gene=which.max(res$padj), intgroup="condition")
+resultsNames(dds)
+geneNames(dds)
+
+# save script
+savehistory("~/ANALYSIS 1/Deseq2 POM4.Rhistory")
+
+# download packages for generating Volcano plots
+BiocManager::install('EnhancedVolcano')
+library(ggrepel)
+library(EnhancedVolcano)
+
+# generation of Volcano plot (first version)
+EnhancedVolcano(res,
+lab = rownames(res),
+x = 'log2FoldChange',
+y = 'pvalue')
+
+# download packages for geneid conversion to symbols
+BiocManager::install("org.Mm.eg.db")
+require('org.Mm.eg.db')
+library('org.Mm.eg.db')
+entrez<-mapIds(org.Mm.eg.db, keys=rownames, column=’ENTREZID’, keytype=’SYMBOL’, multiVals=”first”)
+library("AnnotationDbi")
+library("clusterProfiler")
+
+# conversion of geneid to symbols
+ens <- rownames(res)
+head(ens)
+noc.mapids = mapIds(org.Mm.eg.db,
+keys = ens,
+keytype="ENTREZID",
+column="SYMBOL", multiVals = "first")
+head(noc.mapids)
+noc.mapids.df = as.data.frame(as.matrix(noc.mapids))
+head(noc.mapids.df)
+
+# generation of table
+new_matrix <- cbind(noc.mapids.df, res)
+head(new_matrix)
+data_new <- new_matrix[c("V1", "baseMean", "log2FoldChange", "lfcSE", "stat", "pvalue", "padj")]
+head(data_new)
+
+# generation of volcano plot (second version)
+EnhancedVolcano(res,
+lab = rownames(res),
+x = 'log2FoldChange',
+y = 'padj')
+
+# save the data as table.csv
+write.csv(new_matrix, file="variable_DEG-results.csv")
